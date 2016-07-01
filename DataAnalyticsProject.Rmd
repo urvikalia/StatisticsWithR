@@ -1,0 +1,202 @@
+---
+title: "Exploring the BRFSS data"
+author: "Urvi Kalia"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+    toc_float: yes
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Setup
+
+The initial setup includes loading the required packages and the data.
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(gmodels)
+library(grid)
+library(gridExtra)
+library(vcdExtra)
+```
+
+### Load data
+
+```{r load-data}
+load("brfss2013.RData")
+theme <- theme(axis.text=element_text(size=7),axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),plot.title = element_text(size=9, margin = margin(10, 0, 10, 0))) 
+```
+
+
+* * *
+
+## Part 1: Data
+
+Reading the resources provided (<http://www.cdc.gov/brfss/>) , one can make an inference that type of study conducted is observational.BRFSS conducts both landline based surveys and cell phone based surveys.For landline based survey, interviewer collects data from a randomly selected adult in the household.Where as for cell phone based survey data is collected from adults who reside in a private residence or college housing.Point to note here is, sample is selected from  non-institutionalized adult population, aged 18 years or older, who reside in the US.
+
+Random sampling is visible here , but not random assignment.Hence for the given observational study we can generalize but can not infer causality.
+
+* * *
+
+## Part 2: Research questions
+
+
+
+**Research quesion 1: **
+
+  **Investigate relationship between physical activity and alcohol consumption based on gender.**
+          
+Question of whether exercise encourages people to drink and, likewise, whether drinking encourages people to exercise has been in dispute for quite some time.There are various studies done for both.Reading few of these reports and myself being a marathoner , made me curious to explore this question further and hence came up with this research question.Will investigate if the two variables are independent or not.
+          
+**Research quesion 2:**
+
+  **Investigate alcohol consumption based on age and education based on gender.** 
+
+Explore alcohol consumption across different age groups and different education levels based on gender. 
+          
+**Research quesion 3:**
+
+**Investigate weight of the people having chronic health conditions.specifically Heart attack or Coronary Heart Disease**
+
+Do people who have ever diagonosed Heart attack or Coronary heart disease, show some kind of prominent pattern in terms of their weight.
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+**Initial analysis**
+
+Exploring the dataset quickly one realizes , its a huge dataset with 491775 observations and 330 variables.There are quite a few missing values.
+
+```{r}
+dim(brfss2013)
+sum(is.na(brfss2013))
+```
+
+For simplicity and/or faster processing in R, have limited the scope of this research with the below considerations:  
+
+* Ignore the missing values.
+* Use calculated fields where ever possible.
+
+
+**Research quesion 1:**
+
+Here we need to investigate relationship between physical activity and alcohol consumption based on gender. The attributes being considered are: 
+
+  Variable                                              |   Name    |  
+--------------------------------------------------------|-----------|
+Calculated variable for  aerobic and strength training  | X_parec1  |
+Alcohol intake for men                                  | X_rfdrmn4 |
+Alcohol intake for women                                | X_rfdrwm4 |   
+                                                        |           |
+
+
+
+
+Using chi-square test of independence , one can find if the given two variables are independent or not.Observing the results of chi-square test, it is notisable that for women P- value is very low , which provides strong evidence to suggest that Alcohol intake and Physical exercise are dependent.
+
+
+```{r echo="FALSE"}
+chisq.test(table(brfss2013$X_parec1,brfss2013$X_rfdrmn4))
+chisq.test(table(brfss2013$X_parec1,brfss2013$X_rfdrwm4))
+womenheavyDrinkers <- brfss2013 %>% filter(brfss2013$X_rfdrwm4=='Yes')
+heavyDrinkersIncome <- ggplot(womenheavyDrinkers,aes(X_parec1))+ geom_bar()+ xlab("") + ylab("Frequency") +ggtitle("Heavy female drinkers physical activity distribution") + theme
+grid.arrange(heavyDrinkersIncome,ncol=2)
+```
+
+Graph clearly shows for female heavy drinkers , people who do any form of physical activity are more in proportion as compared to who don't do any exercise.
+
+
+**Research quesion 2:**
+
+Here we explore heavy drinkers across different age groups and different education levels based on gender.Try and identify any pattern or trend.We split the given dataset based on gender and then plot various graphs.
+
+
+```{r}
+## assuming variable 'X_rfdrmn4' is populated only for men
+menheavyDrinkers <- brfss2013 %>% filter(brfss2013$X_rfdrmn4=='Yes')
+
+heavyDrinkersAge <-ggplot(menheavyDrinkers,aes(X_age_g))+ geom_bar()+ xlab("Age") + ylab("Frequency")+  ggtitle("Heavy male drinkers age distribution") +theme
+heavyDrinkersEducation <-ggplot(menheavyDrinkers,aes(X_educag))+ geom_bar()+ xlab("Education") + ggtitle("Heavy male drinkers education distribution") + ylab("Frequency") + theme
+heavyDrinkersIncome <- ggplot(menheavyDrinkers,aes(X_incomg))+ geom_bar()+ xlab("Income") + ylab("Frequency") +ggtitle("Heavy male drinkers income distribution") + theme
+grid.arrange(heavyDrinkersEducation, heavyDrinkersIncome, ncol=2)
+grid.arrange(heavyDrinkersAge,ncol=2)
+```
+
+Following inferences can be derived from above graphs :
+* There is a greater proportion of heavy male drinkers with income equal to or more than   fifty thousand dollars.
+* For age group 45 and above proportion is more as compared to men below age of 45.
+
+```{r}
+## renaming few of the columns for readability 
+menheavyDrinkers <-menheavyDrinkers[c("X_age_g","X_educag","X_incomg")]
+levels(menheavyDrinkers$X_age_g) <- c("A1","A2","A3","A4","A5","A6")
+levels(menheavyDrinkers$X_educag) <- c("noSchool","school","Acollege","Gcollege")
+levels(menheavyDrinkers$X_incomg) <- c("l1","l2","l3","l4","l5")
+menheavyDrinkers <-menheavyDrinkers %>% mutate(Y_age_g =ifelse(X_age_g =='A1' | X_age_g =='A2' | X_age_g =='A3','A1','A2'  ))
+mosaic(~ X_age_g + X_educag + X_incomg, data=menheavyDrinkers, expected=~X_age_g:X_educag + X_incomg,legend=TRUE, gp=shading_Friendly)
+```
+
+Across age groups (age > 34), men who have graduated from the college and have income $50,000 or more , form a major proportion of heavy drinkers in their respecive age groups.
+
+
+
+```{r}
+womenheavyDrinkers <- brfss2013 %>% filter(brfss2013$X_rfdrwm4=='Yes')
+#theme <- theme(axis.text=element_text(size=7),axis.text.x = element_text(angle = 45, vjust #= 1, hjust=1),plot.title = element_text(size=9, margin = margin(10, 0, 10, 0))) 
+heavyDrinkersAge <-ggplot(womenheavyDrinkers,aes(X_age_g))+ geom_bar()+ xlab("Age") + ylab("Frequency")+  ggtitle("Heavy female drinkers age distribution") +theme
+heavyDrinkersEducation <-ggplot(womenheavyDrinkers,aes(X_educag))+ geom_bar()+ xlab("Education") + ggtitle("Heavy female drinkers education distribution") + ylab("Frequency") + theme
+heavyDrinkersIncome <- ggplot(womenheavyDrinkers,aes(X_incomg))+ geom_bar()+ xlab("Income") + ylab("Frequency") +ggtitle("Heavy female drinkers income distribution") + theme
+grid.arrange(heavyDrinkersEducation, heavyDrinkersIncome, ncol=2)
+grid.arrange(heavyDrinkersAge,ncol=2)
+```
+    
+Observing the distribution of heavy female drinkers across age, income and education we can make following inferences :
+
+* There is a greater proportion of heavy female drinkers with income equal to or more than   fifty thousand dollars.
+* For age group 45 and above proportion is more as compared to females below age of 45.
+
+
+**Research quesion 3:**
+
+Here we need to explore some kind of pattern in weights of people with chronic diseases and without chronic diseases.The variables used are :
+
+  Variable          |   Name    |  
+--------------------|-----------|
+     Weight         | X_bmi5cat |
+    Chronic         |  chronic  |
+                    |           |
+
+                    
+A new variable called **chronic** is created, indicating if the person has ever been diagonsed with Heart attack or Coronary Heart Disease.Using Contigency table lets compare weight and their chronic condition.
+
+```{r}
+brfss2013 <-brfss2013 %>% mutate(chronic = ifelse(cvdinfr4=="Yes"|brfss2013$cvdcrhd4=="Yes",1,0))
+brfss2013$chronic <- as.factor(brfss2013$chronic)
+CrossTable(brfss2013$X_bmi5cat,brfss2013$chronic)
+```
+
+Seeing the Contigency table, we observe that , there are 28.2% of people who haven't reported heart attack or Coronary Heart disease are obese.There are around 36.6% of people who have reported heart attack or Coronary Heart disease and are obese.There is a slightly higher proportion of obese people in chronic category as compared to non-chornic.
+
+The variation , just might be due to sampling variation or being obese may be a contributing factor for chronic condition.Proving it statistically might need some more analysis , which is beyond the scope of this document.
+
+Being more specific , and considering the age group between 25 to 54. The difference is more prominent.
+
+```{r}
+middleage <- brfss2013 %>% filter(brfss2013$X_age_g =='Age 25 to 34'|brfss2013$X_age_g =='Age 35 to 44'|brfss2013$X_age_g =='Age 45 to 54')
+CrossTable(middleage$X_bmi5cat,middleage$chronic)
+```
+
+Here the proportion of obese people with Chronic condition is 46.6% where as for non chronic condition it is 30.4%. 
+
+* * *
